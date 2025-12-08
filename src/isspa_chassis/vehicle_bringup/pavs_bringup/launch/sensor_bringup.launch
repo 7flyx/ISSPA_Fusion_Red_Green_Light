@@ -1,0 +1,22 @@
+<launch>
+
+    <arg name="lidar_type" default="a1" doc="lidar_type [a1, ydlidar, velodyne, ls16]"/>
+    <arg name="camera_type" default="astraproplus" doc="camera_type [astras, astrapro, astraproplus]" />
+
+    <!-- 启动雷达 -->
+    <include file="$(find rplidar_ros)/launch/rplidar.launch" if="$(eval arg('lidar_type') == 'a1')" />
+
+    <include file="$(find ydlidar_ros_driver)/launch/TG.launch" if="$(eval arg('lidar_type') == 'ydlidar')" />
+
+    <!-- Coordinate conversion for lidar -->
+    <!-- <node pkg="tf" type="static_transform_publisher" name="base_link_to_laser"
+          args="0.0435 5.258E-05 0.11 3.14 0 0  /base_link /laser 30" if="$(eval arg('lidar_type') == 'a1')"/> -->
+
+    <!-- 启动相机 -->
+    <include file="$(find astra_camera)/launch/astra_pro_plus.launch" if="$(eval arg('camera_type') == 'astraproplus')" />
+    
+    <!-- Coordinate conversion for camera -->
+    <!-- /camera_link to /base_link has been writen in urdf -->
+    <!-- <node pkg="tf" type="static_transform_publisher" name="camera_link_to_laser"
+          args="0 0 0 0 0 0  /camera_link /laser 30" if="$(eval arg('camera_type') == 'astraproplus')"/> -->
+</launch>

@@ -1,0 +1,65 @@
+# YOLOv5 Traffic Lights Dataset Configuration (with Turn Signals)
+# 红绿灯检测数据集配置文件（包含转向灯）
+# 
+# 这个配置文件包含直行、左转、右转红绿灯的完整类别
+# This configuration includes complete classes for straight, left-turn, and right-turn traffic lights
+# 
+# Dataset structure:
+# traffic_lights/
+#   ├── images/
+#   │   ├── train/
+#   │   │   ├── img001.jpg
+#   │   │   ├── img002.jpg
+#   │   │   └── ...
+#   │   └── val/
+#   │       ├── img101.jpg
+#   │       ├── img102.jpg
+#   │       └── ...
+#   └── labels/
+#       ├── train/
+#       │   ├── img001.txt
+#       │   ├── img002.txt
+#       │   └── ...
+#       └── val/
+#           ├── img101.txt
+#           ├── img102.txt
+#           └── ...
+
+# Dataset root directory (relative to this file or absolute path)
+path: ../datasets/traffic_lights  # dataset root dir
+train: images/train  # train images (relative to 'path')
+val: images/val  # val images (relative to 'path')
+test:  # test images (optional, can be same as val)
+
+# Number of classes (9 classes: 3 colors × 3 directions)
+nc: 9
+
+# Class names
+# 类别定义：颜色_方向
+# Class definition: color_direction
+names:
+  # 直行红绿灯 (Straight traffic lights)
+  0: red_straight      # 直行红灯
+  1: green_straight    # 直行绿灯
+  2: yellow_straight   # 直行黄灯
+  
+  # 左转红绿灯 (Left-turn traffic lights)
+  3: red_left          # 左转红灯
+  4: green_left        # 左转绿灯
+  5: yellow_left       # 左转黄灯
+  
+  # 右转红绿灯 (Right-turn traffic lights)
+  6: red_right         # 右转红灯
+  7: green_right       # 右转绿灯
+  8: yellow_right      # 右转黄灯
+
+# Download script/URL (optional)
+# download: https://your-dataset-url.com/traffic_lights.zip
+
+# 训练建议 / Training Recommendations:
+# 1. 如果数据集中没有区分转向，可以先使用简化的3类（red, green, yellow）训练
+# 2. 然后逐步增加转向类别的数据
+# 3. 可以使用数据增强来增加不同转向的样本
+
+
+

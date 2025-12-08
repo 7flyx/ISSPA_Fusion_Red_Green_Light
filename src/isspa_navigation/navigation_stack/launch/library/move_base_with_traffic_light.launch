@@ -1,0 +1,37 @@
+<launch>
+    <!-- 
+    带红绿灯决策的导航栈启动文件
+    Navigation stack launch file with traffic light decision integration
+    
+    该文件在标准导航栈的基础上，添加了红绿灯决策支持
+    This file adds traffic light decision support to the standard navigation stack
+    -->
+    
+    <!-- 参数配置 -->
+    <arg name="nav_use_rotvel" default="true"/>
+    <arg name="enable_traffic_light" default="true"/>
+    
+    <!-- 标准move_base配置 -->
+    <include file="$(find navigation_stack)/launch/library/move_base.launch">
+        <arg name="nav_use_rotvel" value="$(arg nav_use_rotvel)"/>
+    </include>
+    
+    <!-- 如果启用红绿灯决策，重映射cmd_vel话题 -->
+    <group if="$(arg enable_traffic_light)">
+        <!-- 
+        注意：需要修改move_base节点，使其发布到cmd_vel_nav而不是cmd_vel
+        或者使用topic_tools的relay节点进行重映射
+        
+        Note: Need to modify move_base node to publish to cmd_vel_nav instead of cmd_vel
+        Or use topic_tools relay node for remapping
+        -->
+        <node name="cmd_vel_relay" 
+              pkg="topic_tools" 
+              type="relay" 
+              args="/move_base/cmd_vel /cmd_vel_nav" 
+              output="screen"/>
+    </group>
+    
+</launch>
+
+

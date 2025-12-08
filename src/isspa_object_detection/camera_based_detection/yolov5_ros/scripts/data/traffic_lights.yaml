@@ -1,0 +1,44 @@
+# YOLOv5 Traffic Lights Dataset Configuration
+# 红绿灯检测数据集配置文件
+# 
+# Dataset structure:
+# traffic_lights/
+#   ├── images/
+#   │   ├── train/
+#   │   │   ├── img001.jpg
+#   │   │   ├── img002.jpg
+#   │   │   └── ...
+#   │   └── val/
+#   │       ├── img101.jpg
+#   │       ├── img102.jpg
+#   │       └── ...
+#   └── labels/
+#       ├── train/
+#       │   ├── img001.txt
+#       │   ├── img002.txt
+#       │   └── ...
+#       └── val/
+#           ├── img101.txt
+#           ├── img102.txt
+#           └── ...
+
+# Dataset root directory (relative to this file or absolute path)
+path: ../datasets/traffic_lights  # dataset root dir
+train: images/train  # train images (relative to 'path')
+val: images/val  # val images (relative to 'path')
+test:  # test images (optional, can be same as val)
+
+# Number of classes
+nc: 3
+
+# Class names
+names:
+  0: red      # 红灯
+  1: green    # 绿灯
+  2: yellow   # 黄灯
+
+# Download script/URL (optional)
+# download: https://your-dataset-url.com/traffic_lights.zip
+
+
+

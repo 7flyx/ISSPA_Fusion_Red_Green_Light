@@ -1,0 +1,127 @@
+<launch>
+    <!-- 是否打开rviz || Whether to open rviz -->
+    <arg name="use_rviz" default="false"/>
+    <arg name="nav_use_rotvel" default="true"/>
+    
+    <!-- 地图名 || Map name  my_map-->
+    <arg name="map" default="map"/>
+    
+    <!-- 红绿灯检测与决策参数 || Traffic Light Detection and Decision Parameters -->
+    <arg name="enable_traffic_light" default="true"/>  <!-- 是否启用红绿灯检测 -->
+    <arg name="use_smart_turn" default="true"/>  <!-- 是否使用智能转向决策 -->
+    <arg name="camera_topic" default="/camera/color/image_raw"/>  <!-- 摄像头话题 -->
+    <arg name="traffic_light_model" default="$(find yolov5_ros)/scripts/yolov5s_traffic_lights.pt"/>  <!-- 红绿灯检测模型路径 -->
+    <arg name="confidence_threshold" default="0.5"/>  <!-- 检测置信度阈值 -->
+    <arg name="enable_camera" default="true"/>  <!-- 是否启动摄像头 -->
+    <arg name="enable_visualization" default="true"/>  <!-- 是否启用可视化窗口 -->
+    <arg name="camera_name" default="camera"/>  <!-- 摄像头名称 -->
+    <arg name="jetson_mode" default="false"/>  <!-- 是否启用Jetson优化模式 -->
+    <arg name="model_size" default="n"/>  <!-- 模型大小: n(ano)或s(mall)，Jetson推荐使用n -->
+
+    <!-- 摄像头启动 || Camera Launch -->
+    <group if="$(arg enable_camera)">
+        <!-- 启动Astra摄像头 -->
+        <!-- 注意：如果摄像头已经通过其他方式启动，可以注释掉这部分 -->
+        <include file="$(find astra_camera)/launch/astra.launch">
+            <arg name="camera_name" value="$(arg camera_name)"/>
+            <arg name="enable_color" value="true"/>
+            <arg name="enable_depth" value="false"/>
+            <arg name="color_width" value="640"/>
+            <arg name="color_height" value="480"/>
+            <arg name="color_fps" value="30"/>
+        </include>
+        <!-- 如果使用其他摄像头，可以取消注释并修改 -->
+        <!-- <include file="$(find your_camera_package)/launch/your_camera.launch"/> -->
+    </group>
+    
+    <!-- MarkerArray node> -->
+    <node name='send_mark' pkg="navigation_stack" type="send_mark.py"/>
+
+    <!-- 加载地图 || Load map -->
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find mapping_baselines)/maps/$(arg map).yaml"/>
+    
+    <!-- AMCL自适应蒙特卡洛定位 -->
+    <include file="$(find navigation_stack)/launch/library/amcl.launch"/>
+
+    <!-- 导航核心组件move_base -->
+    <!-- 如果启用红绿灯检测，需要将cmd_vel重映射到cmd_vel_nav -->
+    <include file="$(find navigation_stack)/launch/library/move_base.launch">
+        <arg name="nav_use_rotvel" value="$(arg nav_use_rotvel)"/>
+    </include>
+    
+    <!-- 如果启用红绿灯检测，重映射move_base的cmd_vel到cmd_vel_nav -->
+    <group if="$(arg enable_traffic_light)">
+        <node name="cmd_vel_relay" 
+              pkg="topic_tools" 
+              type="relay" 
+              args="/move_base/cmd_vel /cmd_vel_nav" 
+              output="screen"/>
+    </group>
+    
+    <!-- 红绿灯检测与决策模块 || Traffic Light Detection and Decision Module -->
+    <group if="$(arg enable_traffic_light)">
+        <!-- 红绿灯检测节点 -->
+        <node name="yolov5_traffic_light_detection" 
+              pkg="yolov5_ros" 
+              type="detect_ros.py" 
+              output="screen">
+            <!-- 根据Jetson模式选择模型 -->
+            <param name="weights" value="$(arg traffic_light_model)" unless="$(arg jetson_mode)"/>
+            <param name="weights" value="$(find yolov5_ros)/scripts/yolov5$(arg model_size)_traffic_lights.pt" if="$(arg jetson_mode)"/>
+            <param name="source" value="$(arg camera_topic)"/>
+            <param name="conf_thres" value="$(arg confidence_threshold)"/>
+            <param name="view_img" value="false"/>  <!-- 不在检测节点中显示，使用可视化节点 -->
+            <!-- Jetson优化参数 -->
+            <param name="img" value="640" unless="$(arg jetson_mode)"/>
+            <param name="img" value="416" if="$(arg jetson_mode)"/>  <!-- Jetson使用较小分辨率 -->
+            <param name="half" value="false" unless="$(arg jetson_mode)"/>
+            <param name="half" value="true" if="$(arg jetson_mode)"/>  <!-- Jetson使用FP16精度 -->
+        </node>
+        
+        <!-- 红绿灯检测可视化节点 || Traffic Light Detection Visualizer -->
+        <group if="$(arg enable_visualization)">
+            <node name="traffic_light_visualizer" 
+                  pkg="yolov5_ros" 
+                  type="traffic_light_visualizer.py" 
+                  output="screen">
+                <param name="image_topic" value="/detection_results"/>
+                <param name="window_name" value="Traffic Light Detection &amp; Decision"/>
+                <param name="show_decision" value="true"/>
+            </node>
+        </group>
+        
+        <!-- 红绿灯决策节点 -->
+        <group if="$(arg use_smart_turn)">
+            <!-- 使用智能转向决策模块（支持分阶段转向和障碍物检测） -->
+            <node name="smart_traffic_light_decision" 
+                  pkg="yolov5_ros" 
+                  type="traffic_light_decision_smart_turn.py" 
+                  output="screen">
+                <param name="confidence_threshold" value="$(arg confidence_threshold)"/>
+                <param name="yellow_light_action" value="stop"/>
+                <param name="slow_down_speed" value="0.2"/>
+                <param name="turn_point_distance" value="2.0"/>
+                <param name="turn_point_tolerance" value="0.5"/>
+                <param name="obstacle_check_range" value="3.0"/>
+                <param name="obstacle_threshold" value="0.5"/>
+                <param name="turn_clearance_time" value="1.0"/>
+            </node>
+        </group>
+        
+        <group unless="$(arg use_smart_turn)">
+            <!-- 使用基础决策模块（简化版本） -->
+            <node name="traffic_light_decision" 
+                  pkg="yolov5_ros" 
+                  type="traffic_light_decision.py" 
+                  output="screen">
+                <param name="confidence_threshold" value="$(arg confidence_threshold)"/>
+                <param name="yellow_light_action" value="stop"/>
+                <param name="slow_down_speed" value="0.2"/>
+            </node>
+        </group>
+    </group>
+    
+    <!-- RVIZ -->
+    <include file="$(find navigation_stack)/launch/view/view_navigate.launch" if="$(arg use_rviz)"/>
+</launch>
+

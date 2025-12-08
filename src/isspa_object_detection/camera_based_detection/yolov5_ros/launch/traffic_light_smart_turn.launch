@@ -1,0 +1,74 @@
+<launch>
+    <!-- 
+    智能红绿灯决策Launch文件（支持分阶段转向）
+    Smart Traffic Light Decision Launch File (with Phased Turn Support)
+    
+    该文件启动支持分阶段转向决策的红绿灯系统：
+    1. 检测到转向绿灯后，先前进到路口
+    2. 检查转向方向是否有障碍物
+    3. 确认安全后执行转向
+    
+    This file launches traffic light system with phased turn decision:
+    1. After detecting turn green light, first advance to intersection
+    2. Check if there are obstacles in turn direction
+    3. Execute turn after confirming safety
+    -->
+    
+    <!-- 参数配置 -->
+    <arg name="camera_topic" default="/camera/color/image_raw"/>
+    <arg name="model_path" default="$(find yolov5_ros)/scripts/yolov5s_traffic_lights.pt"/>
+    <arg name="confidence_threshold" default="0.5"/>
+    <arg name="yellow_light_action" default="stop"/>
+    <arg name="slow_down_speed" default="0.2"/>
+    
+    <!-- 转向决策参数 -->
+    <arg name="turn_point_distance" default="2.0"/>  <!-- 转向点距离（米） -->
+    <arg name="turn_point_tolerance" default="0.5"/>  <!-- 转向点容差（米） -->
+    <arg name="obstacle_check_range" default="3.0"/>  <!-- 障碍物检测范围（米） -->
+    <arg name="obstacle_threshold" default="0.5"/>  <!-- 障碍物阈值（米） -->
+    <arg name="turn_clearance_time" default="1.0"/>  <!-- 转向安全确认时间（秒） -->
+    
+    <!-- 红绿灯检测节点 -->
+    <node name="yolov5_traffic_light_detection" 
+          pkg="yolov5_ros" 
+          type="detect_ros.py" 
+          output="screen">
+        <param name="weights" value="$(arg model_path)"/>
+        <param name="source" value="$(arg camera_topic)"/>
+        <param name="conf_thres" value="$(arg confidence_threshold)"/>
+        <param name="view_img" value="false"/>
+    </node>
+    
+    <!-- 智能红绿灯决策节点 -->
+    <node name="smart_traffic_light_decision" 
+          pkg="yolov5_ros" 
+          type="traffic_light_decision_smart_turn.py" 
+          output="screen">
+        <param name="confidence_threshold" value="$(arg confidence_threshold)"/>
+        <param name="yellow_light_action" value="$(arg yellow_light_action)"/>
+        <param name="slow_down_speed" value="$(arg slow_down_speed)"/>
+        <param name="turn_point_distance" value="$(arg turn_point_distance)"/>
+        <param name="turn_point_tolerance" value="$(arg turn_point_tolerance)"/>
+        <param name="obstacle_check_range" value="$(arg obstacle_check_range)"/>
+        <param name="obstacle_threshold" value="$(arg obstacle_threshold)"/>
+        <param name="turn_clearance_time" value="$(arg turn_clearance_time)"/>
+    </node>
+    
+    <!-- 
+    注意：
+    1. 导航栈需要将速度命令发布到 /cmd_vel_nav 话题
+    2. 需要激光雷达数据发布到 /scan 话题用于障碍物检测
+    3. 需要车辆位姿发布到 /current_pose 话题（或根据实际情况调整）
+    4. 导航路径话题：/move_base/NavfnROS/plan（或根据实际情况调整）
+    
+    Note:
+    1. Navigation stack should publish velocity commands to /cmd_vel_nav topic
+    2. Laser scan data should be published to /scan topic for obstacle detection
+    3. Vehicle pose should be published to /current_pose topic (adjust if needed)
+    4. Navigation path topic: /move_base/NavfnROS/plan (adjust if needed)
+    -->
+    
+</launch>
+
+
+

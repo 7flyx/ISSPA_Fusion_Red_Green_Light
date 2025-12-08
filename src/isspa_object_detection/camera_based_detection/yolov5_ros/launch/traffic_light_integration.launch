@@ -1,0 +1,50 @@
+<launch>
+    <!-- 
+    红绿灯检测与决策集成Launch文件
+    Traffic Light Detection and Decision Integration Launch File
+    
+    该文件启动红绿灯检测和决策模块，并将其与导航系统集成
+    This file launches traffic light detection and decision modules, integrating them with the navigation system
+    -->
+    
+    <!-- 参数配置 -->
+    <arg name="camera_topic" default="/camera/color/image_raw"/>
+    <arg name="model_path" default="$(find yolov5_ros)/scripts/yolov5s_traffic_lights.pt"/>
+    <arg name="confidence_threshold" default="0.5"/>
+    <arg name="yellow_light_action" default="stop"/>  <!-- 'stop' or 'slow' -->
+    <arg name="slow_down_speed" default="0.2"/>
+    
+    <!-- 红绿灯检测节点 -->
+    <node name="yolov5_traffic_light_detection" 
+          pkg="yolov5_ros" 
+          type="detect_ros.py" 
+          output="screen">
+        <param name="weights" value="$(arg model_path)"/>
+        <param name="source" value="$(arg camera_topic)"/>
+        <param name="conf_thres" value="$(arg confidence_threshold)"/>
+        <param name="view_img" value="false"/>
+    </node>
+    
+    <!-- 红绿灯决策节点 -->
+    <node name="traffic_light_decision" 
+          pkg="yolov5_ros" 
+          type="traffic_light_decision.py" 
+          output="screen">
+        <param name="confidence_threshold" value="$(arg confidence_threshold)"/>
+        <param name="yellow_light_action" value="$(arg yellow_light_action)"/>
+        <param name="slow_down_speed" value="$(arg slow_down_speed)"/>
+    </node>
+    
+    <!-- 
+    注意：为了正确工作，导航栈需要将速度命令发布到 /cmd_vel_nav 话题
+    然后决策模块会将其与红绿灯决策融合后发布到 /cmd_vel 话题
+    
+    Note: For proper operation, the navigation stack should publish velocity commands 
+    to /cmd_vel_nav topic, and the decision module will fuse it with traffic light 
+    decisions and publish to /cmd_vel topic
+    -->
+    
+</launch>
+
+
+
