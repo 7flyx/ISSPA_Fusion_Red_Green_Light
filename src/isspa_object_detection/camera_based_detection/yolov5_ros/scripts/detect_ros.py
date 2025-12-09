@@ -114,6 +114,7 @@ from geometry_msgs.msg import Pose2D
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from yolov5_ros.msg import TrafficLightState
+import numpy as np
 
 
 
@@ -198,6 +199,100 @@ def run(
 
 
     source = str(source)
+    
+    # 检查是否是ROS话题（以/开头且不是文件路径）
+    is_ros_topic = source.startswith('/') and not Path(source).exists() and not source.endswith(('.jpg', '.jpeg', '.png', '.mp4', '.avi', '.txt'))
+    
+    if is_ros_topic:
+        # ROS话题模式：订阅ROS图像话题
+        rospy.loginfo(f"Using ROS topic mode: {source}")
+        
+        # Load model
+        device = select_device(device)
+        model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
+        stride, names, pt = model.stride, model.names, model.pt
+        imgsz = check_img_size(imgsz, s=stride)  # check image size
+        
+        # 模型预热
+        model.warmup(imgsz=(1 if pt or model.triton else 1, 3, *imgsz))
+        
+        # 订阅ROS图像话题
+        def image_callback(msg):
+            try:
+                # 转换ROS图像消息为OpenCV格式
+                cv_image = bridge.imgmsg_to_cv2(msg, "bgr8")
+                
+                # 预处理图像
+                im0 = cv_image.copy()
+                im = cv2.resize(im0, imgsz)
+                im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+                im = np.ascontiguousarray(im)
+                
+                # 转换为tensor
+                im = torch.from_numpy(im).to(model.device)
+                im = im.half() if model.fp16 else im.float()
+                im /= 255
+                if len(im.shape) == 3:
+                    im = im[None]  # expand for batch dim
+                
+                # 推理
+                pred = model(im, augment=augment, visualize=False)
+                pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+                
+                # 处理检测结果
+                det = pred[0]
+                annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+                
+                # 检测红绿灯状态
+                traffic_light_state = TrafficLightState()
+                traffic_light_state.state = 0
+                traffic_light_state.confidence = 0.0
+                traffic_light_state.frame_id = msg.header.frame_id
+                traffic_light_state.stamp = msg.header.stamp
+                
+                max_traffic_light_conf = 0.0
+                
+                if len(det):
+                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
+                    
+                    for *xyxy, conf, cls in reversed(det):
+                        c = int(cls)
+                        label = names[c] if hide_conf else f'{names[c]} {float(conf):.2f}'
+                        annotator.box_label(xyxy, label, color=colors(c, True))
+                        
+                        # 检查是否是红绿灯
+                        class_name = names[c].lower()
+                        if class_name in traffic_light_classes:
+                            if float(conf) > max_traffic_light_conf:
+                                max_traffic_light_conf = float(conf)
+                                traffic_light_state.state = traffic_light_classes[class_name]
+                                traffic_light_state.confidence = float(conf)
+                
+                # 发布检测结果图像
+                result_image = annotator.result()
+                try:
+                    img_msg = bridge.cv2_to_imgmsg(result_image, "bgr8")
+                    img_msg.header = msg.header
+                    image_pub.publish(img_msg)
+                except CvBridgeError as e:
+                    rospy.logerr(f"CvBridge error: {e}")
+                
+                # 发布红绿灯状态
+                traffic_light_pub.publish(traffic_light_state)
+                
+            except Exception as e:
+                rospy.logerr(f"Error processing image: {e}")
+                import traceback
+                rospy.logerr(traceback.format_exc())
+        
+        # 订阅图像话题
+        rospy.Subscriber(source, Image, image_callback, queue_size=1, buff_size=52428800)
+        rospy.loginfo(f"Subscribed to ROS topic: {source}")
+        rospy.loginfo("Waiting for images...")
+        rospy.spin()
+        return
+    
+    # 非ROS话题模式：使用原有的文件/摄像头/URL处理逻辑
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
