@@ -443,7 +443,15 @@ def main():
     conf_thres = rospy.get_param('~conf_thres', 0.25)
     iou_thres = rospy.get_param('~iou_thres', 0.45)
     max_det = rospy.get_param('~max_det', 1000)
-    device = rospy.get_param('~device', '')
+    # 设备选择：如果device为空，自动检测；如果为'cpu'，强制使用CPU
+    device_param = rospy.get_param('~device', '')
+    if device_param == 'cpu':
+        device = 'cpu'
+        rospy.loginfo("强制使用CPU模式")
+    elif device_param == '':
+        device = ''  # 让select_device自动选择
+    else:
+        device = device_param
     view_img = rospy.get_param('~view_img', False)
     save_txt = rospy.get_param('~save_txt', False)
     save_csv = rospy.get_param('~save_csv', False)

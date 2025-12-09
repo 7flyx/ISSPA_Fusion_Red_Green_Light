@@ -12,9 +12,10 @@
     <arg name="confidence_threshold" default="0.5"/>  <!-- 检测置信度阈值 -->
     <arg name="enable_visualization" default="true"/>  <!-- 是否启用可视化窗口 -->
     <arg name="use_smart_turn" default="true"/>  <!-- 是否使用智能转向决策 -->
-    <arg name="use_pc_gpu" default="true"/>  <!-- 使用PC的GPU（通常性能更好） -->
-    <arg name="model_size" default="s"/>  <!-- 模型大小: n/s/m/l/x，PC可以使用更大的模型 -->
-    <arg name="image_size" default="640"/>  <!-- 图像尺寸，PC可以使用更大的尺寸 -->
+    <arg name="use_pc_gpu" default="false"/>  <!-- 使用PC的GPU（虚拟机通常无法使用GPU） -->
+    <arg name="use_cpu" default="true"/>  <!-- 使用CPU模式（虚拟机推荐） -->
+    <arg name="model_size" default="n"/>  <!-- 模型大小: n/s/m/l/x，CPU推荐使用n或s -->
+    <arg name="image_size" default="416"/>  <!-- 图像尺寸，CPU推荐使用416或更小 -->
     
     <!-- 如果启用红绿灯检测，重映射move_base的cmd_vel到cmd_vel_nav -->
     <!-- 注意：move_base在小车端，这里只做转发 -->
@@ -37,10 +38,11 @@
         <param name="source" value="$(arg camera_topic)"/>  <!-- 从小车端接收图像 -->
         <param name="conf_thres" value="$(arg confidence_threshold)"/>
         <param name="view_img" value="false"/>  <!-- 不在检测节点中显示，使用可视化节点 -->
-        <param name="img" value="$(arg image_size)"/>  <!-- PC可以使用640或更大 -->
-        <param name="half" value="false"/>  <!-- PC通常不需要FP16 -->
+        <param name="img" value="$(arg image_size)"/>  <!-- CPU推荐416，GPU可以使用640 -->
+        <param name="half" value="false"/>  <!-- CPU不支持FP16 -->
         <param name="device" value="0" if="$(arg use_pc_gpu)"/>  <!-- 使用GPU 0 -->
-        <param name="device" value="cpu" unless="$(arg use_pc_gpu)"/>  <!-- 或使用CPU -->
+        <param name="device" value="cpu" if="$(arg use_cpu)"/>  <!-- 使用CPU -->
+        <param name="device" value="cpu" unless="$(arg use_pc_gpu)"/>  <!-- 默认使用CPU -->
     </node>
     
     <!-- 红绿灯检测可视化节点 || Traffic Light Detection Visualizer -->
