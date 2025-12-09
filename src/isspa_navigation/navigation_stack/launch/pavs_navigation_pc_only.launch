@@ -1,0 +1,105 @@
+<launch>
+    <!-- 
+    PC端启动文件 - 只启动YOLOv5检测、决策和可视化节点
+    PC-side launch file - Only start YOLOv5 detection, decision, and visualization nodes
+    底盘和导航节点在小车端执行
+    Chassis and navigation nodes run on vehicle
+    -->
+    
+    <!-- 红绿灯检测与决策参数 || Traffic Light Detection and Decision Parameters -->
+    <arg name="camera_topic" default="/camera/color/image_raw"/>  <!-- 摄像头话题（从小车端接收） -->
+    <arg name="traffic_light_model" default="$(find yolov5_ros)/scripts/yolov5s_traffic_lights.pt"/>  <!-- 红绿灯检测模型路径 -->
+    <arg name="confidence_threshold" default="0.5"/>  <!-- 检测置信度阈值 -->
+    <arg name="enable_visualization" default="true"/>  <!-- 是否启用可视化窗口 -->
+    <arg name="use_smart_turn" default="true"/>  <!-- 是否使用智能转向决策 -->
+    <arg name="use_pc_gpu" default="true"/>  <!-- 使用PC的GPU（通常性能更好） -->
+    <arg name="model_size" default="s"/>  <!-- 模型大小: n/s/m/l/x，PC可以使用更大的模型 -->
+    <arg name="image_size" default="640"/>  <!-- 图像尺寸，PC可以使用更大的尺寸 -->
+    
+    <!-- 如果启用红绿灯检测，重映射move_base的cmd_vel到cmd_vel_nav -->
+    <!-- 注意：move_base在小车端，这里只做转发 -->
+    <node name="cmd_vel_relay" 
+          pkg="topic_tools" 
+          type="relay" 
+          args="/move_base/cmd_vel /cmd_vel_nav" 
+          output="screen"/>
+    
+    <!-- 红绿灯检测与决策模块 || Traffic Light Detection and Decision Module -->
+    <!-- 红绿灯检测节点（在PC上运行，使用PC的GPU） -->
+    <node name="yolov5_traffic_light_detection" 
+          pkg="yolov5_ros" 
+          type="detect_ros.py" 
+          output="screen"
+          respawn="true"
+          respawn_delay="2">
+        <!-- PC端可以使用更大的模型和更高的分辨率 -->
+        <param name="weights" value="$(arg traffic_light_model)"/>
+        <param name="source" value="$(arg camera_topic)"/>  <!-- 从小车端接收图像 -->
+        <param name="conf_thres" value="$(arg confidence_threshold)"/>
+        <param name="view_img" value="false"/>  <!-- 不在检测节点中显示，使用可视化节点 -->
+        <param name="img" value="$(arg image_size)"/>  <!-- PC可以使用640或更大 -->
+        <param name="half" value="false"/>  <!-- PC通常不需要FP16 -->
+        <param name="device" value="0" if="$(arg use_pc_gpu)"/>  <!-- 使用GPU 0 -->
+        <param name="device" value="cpu" unless="$(arg use_pc_gpu)"/>  <!-- 或使用CPU -->
+    </node>
+    
+    <!-- 红绿灯检测可视化节点 || Traffic Light Detection Visualizer -->
+    <group if="$(arg enable_visualization)">
+        <node name="traffic_light_visualizer" 
+              pkg="yolov5_ros" 
+              type="traffic_light_visualizer.py" 
+              output="screen"
+              respawn="true"
+              respawn_delay="2">
+            <param name="image_topic" value="/detection_results"/>
+            <param name="window_name" value="Traffic Light Detection &amp; Decision (PC)"/>
+            <param name="show_decision" value="true"/>
+        </node>
+        
+        <!-- 可选：显示原始摄像头图像 -->
+        <node name="image_view_raw" 
+              pkg="image_view" 
+              type="image_view" 
+              respawn="false" 
+              output="screen">
+            <remap from="image" to="$(arg camera_topic)"/>
+            <param name="autosize" value="true"/>
+            <param name="window_name" value="Camera Feed (from Vehicle)"/>
+        </node>
+    </group>
+    
+    <!-- 红绿灯决策节点 -->
+    <group if="$(arg use_smart_turn)">
+        <!-- 使用智能转向决策模块（支持分阶段转向和障碍物检测） -->
+        <node name="smart_traffic_light_decision" 
+              pkg="yolov5_ros" 
+              type="traffic_light_decision_smart_turn.py" 
+              output="screen"
+              respawn="true"
+              respawn_delay="2">
+            <param name="confidence_threshold" value="$(arg confidence_threshold)"/>
+            <param name="yellow_light_action" value="stop"/>
+            <param name="slow_down_speed" value="0.2"/>
+            <param name="turn_point_distance" value="2.0"/>
+            <param name="turn_point_tolerance" value="0.5"/>
+            <param name="obstacle_check_range" value="3.0"/>
+            <param name="obstacle_threshold" value="0.5"/>
+            <param name="turn_clearance_time" value="1.0"/>
+        </node>
+    </group>
+    
+    <group unless="$(arg use_smart_turn)">
+        <!-- 使用基础决策模块（简化版本） -->
+        <node name="traffic_light_decision" 
+              pkg="yolov5_ros" 
+              type="traffic_light_decision.py" 
+              output="screen"
+              respawn="true"
+              respawn_delay="2">
+            <param name="confidence_threshold" value="$(arg confidence_threshold)"/>
+            <param name="yellow_light_action" value="stop"/>
+            <param name="slow_down_speed" value="0.2"/>
+        </node>
+    </group>
+</launch>
+
