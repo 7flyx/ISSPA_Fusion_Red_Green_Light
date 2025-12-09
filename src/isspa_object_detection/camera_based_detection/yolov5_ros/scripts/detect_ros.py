@@ -45,7 +45,62 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-from ultralytics.utils.plotting import Annotator, colors, save_one_box
+# 尝试从ultralytics导入，如果失败则使用本地实现
+try:
+    from ultralytics.utils.plotting import Annotator, colors, save_one_box
+    USE_ULTRALYTICS = True
+except ImportError:
+    USE_ULTRALYTICS = False
+    # 如果ultralytics未安装，使用简化的本地实现
+    try:
+        # 尝试从utils.plots导入（但utils.plots可能也依赖ultralytics）
+        from utils.plots import Annotator, colors
+        # save_one_box需要单独处理
+        def save_one_box(xyxy, im, file, gain=1.02, pad=10, square=False, BGR=False, save=True):
+            import cv2
+            xyxy = [int(x) for x in xyxy]
+            b = [int(x) for x in xyxy]
+            b[2] = min(b[2], im.shape[1])
+            b[3] = min(b[3], im.shape[0])
+            crop = im[b[1]:b[3], b[0]:b[2]]
+            if save:
+                cv2.imwrite(str(file), crop)
+            return crop
+    except ImportError:
+        # 如果utils.plots也依赖ultralytics，创建简单的替代实现
+        import cv2
+        class Annotator:
+            def __init__(self, im, line_width=None, font_size=None, font='Arial.ttf', pil=False, example=''):
+                self.im = im
+                self.lw = line_width or max(round(sum(im.shape) / 2 * 0.003), 2)
+            def box_label(self, box, label='', color=(128, 128, 128), txt_color=(255, 255, 255)):
+                p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
+                cv2.rectangle(self.im, p1, p2, color, thickness=self.lw, lineType=cv2.LINE_AA)
+                if label:
+                    tf = max(self.lw - 1, 1)
+                    w, h = cv2.getTextSize(label, 0, fontScale=self.lw / 3, thickness=tf)[0]
+                    outside = p1[1] - h - 3 >= 0
+                    p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
+                    cv2.rectangle(self.im, p1, p2, color, -1, cv2.LINE_AA)
+                    cv2.putText(self.im, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2),
+                              0, self.lw / 3, txt_color, thickness=tf, lineType=cv2.LINE_AA)
+            def result(self):
+                return self.im
+        def colors(i, bgr=False):
+            palette = [(255, 56, 56), (255, 157, 151), (255, 112, 31), (255, 178, 29), (207, 210, 49),
+                       (72, 249, 10), (146, 204, 23), (61, 219, 134), (26, 147, 52), (0, 212, 187)]
+            c = palette[int(i) % len(palette)]
+            return (c[2], c[1], c[0]) if bgr else c
+        def save_one_box(xyxy, im, file, gain=1.02, pad=10, square=False, BGR=False, save=True):
+            xyxy = [int(x) for x in xyxy]
+            b = [int(x) for x in xyxy]
+            b[2] = min(b[2], im.shape[1])
+            b[3] = min(b[3], im.shape[0])
+            crop = im[b[1]:b[3], b[0]:b[2]]
+            if save:
+                cv2.imwrite(str(file), crop)
+            return crop
+    rospy.logwarn("ultralytics未安装，使用本地fallback实现。建议安装: pip3 install 'ultralytics<8.3.0'")
 
 from models.common import DetectMultiBackend
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams

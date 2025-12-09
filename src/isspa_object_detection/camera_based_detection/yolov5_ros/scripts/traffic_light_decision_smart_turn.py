@@ -24,7 +24,8 @@ from std_msgs.msg import Int32, Bool, String
 from geometry_msgs.msg import Twist, PoseStamped, Point
 from nav_msgs.msg import Path
 from sensor_msgs.msg import LaserScan
-from move_base_msgs.msg import MoveBaseActionGoal, GoalID
+from move_base_msgs.msg import MoveBaseActionGoal
+from actionlib_msgs.msg import GoalID
 from yolov5_ros.msg import TrafficLightState
 
 class SmartTrafficLightDecision:
