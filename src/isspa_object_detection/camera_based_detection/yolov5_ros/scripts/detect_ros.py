@@ -434,42 +434,58 @@ def run(
     #     rate.sleep()
 
 def main():
-    weights = ROOT / 'yolov5s_traffic_lights.pt'
-    source = '0'
-    data = ROOT / 'data/coco128.yaml'
-    imgsz = (640, 640)
-    conf_thres = 0.25
-    iou_thres = 0.45
-    max_det = 1000
-    device = ''
-    view_img = False
-    save_txt = False
-    save_csv = False
-    save_conf = False
-    save_crop = False
-    nosave = True
-    classes = None
-    agnostic_nms = False
-    augment = False
-    visualize = False
-    update = False
-    project = ROOT / 'runs/detect'
-    name = 'exp'
-    exist_ok = False
-    line_thickness = 3
-    hide_labels = False
-    hide_conf = False
-    half = False
-    dnn = False
-    vid_stride = 1
-
-    check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-    run(weights=weights, source=source, data=data, imgsz=imgsz, conf_thres=conf_thres, iou_thres=iou_thres,
-        max_det=max_det, device=device, view_img=view_img, save_txt=save_txt, save_csv=save_csv,
-        save_conf=save_conf, save_crop=save_crop, nosave=nosave, classes=classes, agnostic_nms=agnostic_nms,
-        augment=augment, visualize=visualize, update=update, project=project, name=name, exist_ok=exist_ok,
-        line_thickness=line_thickness, hide_labels=hide_labels, hide_conf=hide_conf, half=half, dnn=dnn,
-        vid_stride=vid_stride)
+    # 从ROS参数服务器读取参数（节点已在run函数中初始化）
+    weights = rospy.get_param('~weights', str(ROOT / 'yolov5s_traffic_lights.pt'))
+    source = rospy.get_param('~source', '0')
+    data = rospy.get_param('~data', str(ROOT / 'data/coco128.yaml'))
+    img_size = rospy.get_param('~img', 640)  # 单个值，会转换为元组
+    imgsz = (img_size, img_size)
+    conf_thres = rospy.get_param('~conf_thres', 0.25)
+    iou_thres = rospy.get_param('~iou_thres', 0.45)
+    max_det = rospy.get_param('~max_det', 1000)
+    device = rospy.get_param('~device', '')
+    view_img = rospy.get_param('~view_img', False)
+    save_txt = rospy.get_param('~save_txt', False)
+    save_csv = rospy.get_param('~save_csv', False)
+    save_conf = rospy.get_param('~save_conf', False)
+    save_crop = rospy.get_param('~save_crop', False)
+    nosave = rospy.get_param('~nosave', True)
+    classes = rospy.get_param('~classes', None)
+    agnostic_nms = rospy.get_param('~agnostic_nms', False)
+    augment = rospy.get_param('~augment', False)
+    visualize = rospy.get_param('~visualize', False)
+    update = rospy.get_param('~update', False)
+    project = rospy.get_param('~project', str(ROOT / 'runs/detect'))
+    name = rospy.get_param('~name', 'exp')
+    exist_ok = rospy.get_param('~exist_ok', False)
+    line_thickness = rospy.get_param('~line_thickness', 3)
+    hide_labels = rospy.get_param('~hide_labels', False)
+    hide_conf = rospy.get_param('~hide_conf', False)
+    half = rospy.get_param('~half', False)
+    dnn = rospy.get_param('~dnn', False)
+    vid_stride = rospy.get_param('~vid_stride', 1)
+    
+    # 转换字符串路径为Path对象
+    weights = Path(weights)
+    data = Path(data) if data else None
+    project = Path(project)
+    
+    rospy.loginfo(f"Starting YOLOv5 detection with weights: {weights}")
+    rospy.loginfo(f"Source: {source}, Image size: {imgsz}, Confidence: {conf_thres}")
+    
+    try:
+        check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
+        run(weights=weights, source=source, data=data, imgsz=imgsz, conf_thres=conf_thres, iou_thres=iou_thres,
+            max_det=max_det, device=device, view_img=view_img, save_txt=save_txt, save_csv=save_csv,
+            save_conf=save_conf, save_crop=save_crop, nosave=nosave, classes=classes, agnostic_nms=agnostic_nms,
+            augment=augment, visualize=visualize, update=update, project=project, name=name, exist_ok=exist_ok,
+            line_thickness=line_thickness, hide_labels=hide_labels, hide_conf=hide_conf, half=half, dnn=dnn,
+            vid_stride=vid_stride)
+    except Exception as e:
+        rospy.logerr(f"YOLOv5 detection failed: {e}")
+        import traceback
+        rospy.logerr(traceback.format_exc())
+        raise
 
 if __name__ == '__main__':
     main()

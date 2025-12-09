@@ -22,7 +22,8 @@
     <group if="$(arg enable_camera)">
         <!-- 启动Astra摄像头 -->
         <!-- 注意：如果摄像头已经通过其他方式启动，可以注释掉这部分 -->
-        <include file="$(find astra_camera)/launch/astra.launch">
+        <!-- 尝试启动Astra摄像头，如果失败会显示错误但不会阻止其他节点启动 -->
+        <include file="$(find astra_camera)/launch/astra.launch" if="$(eval arg('camera_name') == 'camera')">
             <arg name="camera_name" value="$(arg camera_name)"/>
             <arg name="enable_color" value="true"/>
             <arg name="enable_depth" value="false"/>
@@ -30,8 +31,20 @@
             <arg name="color_height" value="480"/>
             <arg name="color_fps" value="30"/>
         </include>
-        <!-- 如果使用其他摄像头，可以取消注释并修改 -->
-        <!-- <include file="$(find your_camera_package)/launch/your_camera.launch"/> -->
+        <!-- 如果使用Astra Pro Plus -->
+        <include file="$(find astra_camera)/launch/astra_pro_plus.launch" if="$(eval arg('camera_name') == 'astraproplus')">
+            <arg name="camera_name" value="$(arg camera_name)"/>
+        </include>
+        <!-- 如果使用USB摄像头 -->
+        <node name="usb_cam" pkg="usb_cam" type="usb_cam_node" output="screen" if="$(eval arg('camera_name') == 'usb_cam')">
+            <param name="video_device" value="/dev/video0"/>
+            <param name="image_width" value="640"/>
+            <param name="image_height" value="480"/>
+            <param name="pixel_format" value="yuyv"/>
+            <param name="camera_frame_id" value="usb_cam"/>
+            <param name="io_method" value="mmap"/>
+            <remap from="usb_cam/image_raw" to="/camera/color/image_raw"/>
+        </node>
     </group>
     
     <!-- MarkerArray node> -->
@@ -64,7 +77,9 @@
         <node name="yolov5_traffic_light_detection" 
               pkg="yolov5_ros" 
               type="detect_ros.py" 
-              output="screen">
+              output="screen"
+              respawn="true"
+              respawn_delay="2">
             <!-- 根据Jetson模式选择模型 -->
             <param name="weights" value="$(arg traffic_light_model)" unless="$(arg jetson_mode)"/>
             <param name="weights" value="$(find yolov5_ros)/scripts/yolov5$(arg model_size)_traffic_lights.pt" if="$(arg jetson_mode)"/>
@@ -83,7 +98,9 @@
             <node name="traffic_light_visualizer" 
                   pkg="yolov5_ros" 
                   type="traffic_light_visualizer.py" 
-                  output="screen">
+                  output="screen"
+                  respawn="true"
+                  respawn_delay="2">
                 <param name="image_topic" value="/detection_results"/>
                 <param name="window_name" value="Traffic Light Detection &amp; Decision"/>
                 <param name="show_decision" value="true"/>
@@ -96,7 +113,9 @@
             <node name="smart_traffic_light_decision" 
                   pkg="yolov5_ros" 
                   type="traffic_light_decision_smart_turn.py" 
-                  output="screen">
+                  output="screen"
+                  respawn="true"
+                  respawn_delay="2">
                 <param name="confidence_threshold" value="$(arg confidence_threshold)"/>
                 <param name="yellow_light_action" value="stop"/>
                 <param name="slow_down_speed" value="0.2"/>
@@ -113,7 +132,9 @@
             <node name="traffic_light_decision" 
                   pkg="yolov5_ros" 
                   type="traffic_light_decision.py" 
-                  output="screen">
+                  output="screen"
+                  respawn="true"
+                  respawn_delay="2">
                 <param name="confidence_threshold" value="$(arg confidence_threshold)"/>
                 <param name="yellow_light_action" value="stop"/>
                 <param name="slow_down_speed" value="0.2"/>
